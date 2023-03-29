@@ -1,0 +1,112 @@
+
+#
+# edx2gift package
+#
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edx2gift"
+description = "A converter from edX XML format to Moodle GIFT format"
+readme = "README.md"
+authors = [
+  { name="SergioSim", email="sergio.simonian@etu.univ-cotedazur.fr" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.10"
+license = {file = "LICENSE.md"}
+keywords = ["edx2gift"]
+dependencies = [
+    "click>=8.1.0",
+    "defusedxml>=0.7.0",
+    "fastapi>=0.95.0",
+    "Jinja2>=3.1.0",
+    "passlib[bcrypt]>=1.7.0",
+    "pydantic>=1.10.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.6",
+    "uvicorn[standard]>=0.21.0",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/SergioSim/edx2gift"
+"Bug Tracker" = "https://github.com/SergioSim/edx2gift/issues"
+
+[project.optional-dependencies]
+dev = [
+    "bandit==1.7.4",
+    "black==23.1.0",
+    "build==0.10.0",
+    "factory-boy==3.2.1",
+    "Faker==17.0.0",
+    "Flake8-pyproject==1.2.2",
+    "flake8==6.0.0",
+    "httpx==0.23.3",
+    "ipdb==0.13.11",
+    "ipython==8.10.0",
+    "isort==5.12.0",
+    "pydocstyle==6.3.0",
+    "pyfakefs==5.0.0",
+    "pylint==2.16.2",
+    "pytest==7.2.1",
+    "pytest-cov==4.0.0",
+]
+ci = [
+    "twine==4.0.2",
+]
+
+[project.scripts]
+edx2gift = "edx2gift.cli:cli"
+
+[tool.setuptools]
+packages = ["edx2gift"]
+
+[tool.setuptools.dynamic]
+version = { attr = "edx2gift.__version__" }
+
+
+# Third party packages configuration
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+exclude = [
+    "build",
+    "__pycache__",
+]
+
+[tool.pydocstyle]
+convention = "google"
+match_dir = "^(?!tests|venv|build|scripts).*"
+
+[tool.isort]
+known_edx2gift = ["edx2gift"]
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "EDX2GIFT",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
+]
+skip_glob = ["venv"]
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "-v --cov-report term-missing --cov=edx2gift"
+python_files = [
+    "test_*.py",
+    "tests.py",
+]
+testpaths = [
+    "tests",
+]
