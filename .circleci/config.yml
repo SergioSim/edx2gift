@@ -1,0 +1,232 @@
+version: 2.1
+
+jobs:
+  # Git jobs
+  # Check that the git history is clean and complies with our expectations
+  lint-git:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      # Make sure the changes don't add a "print" statement to the code base.
+      # We should exclude the ".circleci" folder from the search as the very command that checks
+      # the absence of "print" is including a "print(" itself.
+      - run:
+          name: enforce absence of print statements in code
+          command: |
+            ! git diff origin/master..HEAD -- . ':(exclude).circleci' | grep "print("
+      - run:
+          name: enforce absence of FIXME in code
+          command: |
+            ! git diff origin/master..HEAD -- . ':(exclude).circleci' ':(exclude).pylintrc' | grep "FIXME"
+      - run:
+          name: Check absence of fixup commits
+          command: |
+            ! git log --pretty=format:%s | grep 'fixup!'
+      - run:
+          name: Install gitlint
+          command: |
+            pip install --user gitlint requests
+      - run:
+          name: lint commit messages added to master
+          command: |
+            ~/.local/bin/gitlint --commits origin/master..HEAD
+
+  # Check that the CHANGELOG has been updated in the current branch
+  check-changelog:
+    docker:
+      - image: cimg/base:current
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - run:
+          name: Check that the CHANGELOG has been modified in the current branch
+          command: |
+            git whatchanged --name-only --pretty="" origin..HEAD | grep CHANGELOG
+  # Check that the CHANGELOG max line length does not exceed 80 characters
+  lint-changelog:
+    docker:
+      - image: debian:stretch
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - run:
+          name: Check CHANGELOG max line length
+          command: |
+            # Get the longuest line width (ignoring release links)
+            test $(cat CHANGELOG.md | grep -Ev "^\[.*\]: https://github.com/" | wc -L) -le 80
+
+  # ---- Dev jobs ----
+  # Build development environment
+  build:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - run:
+          name: Install development dependencies
+          command: pip install --user .[dev]
+      - save_cache:
+          paths:
+            - ~/.local
+          key: v1-dependencies-{{ .Revision }}
+ # Lint sources
+  lint:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ .Revision }}
+      - run:
+          name: Lint code with flake8
+          command: ~/.local/bin/flake8
+      - run:
+          name: Lint code with isort
+          command: ~/.local/bin/isort --recursive --check-only .
+      - run:
+          name: Lint code with black
+          command: ~/.local/bin/black edx2gift tests --check
+      - run:
+          name: Lint code with pylint
+          command: ~/.local/bin/pylint edx2gift tests
+      - run:
+          name: Lint code with bandit
+          command: ~/.local/bin/bandit -qr edx2gift
+      - run:
+          name: Lint code with pydocstyle
+          command: ~/.local/bin/pydocstyle
+# Run tests
+  test:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ .Revision }}
+      - run:
+          name: Run tests
+          command: ~/.local/bin/pytest
+
+  # ---- Packaging jobs ----
+  package:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ .Revision }}
+      - attach_workspace:
+          at: ~/edx2gift
+      - run:
+          name: Build python package
+          command: python -m build
+      # Persist build packages to the workspace
+      - persist_to_workspace:
+          root: ~/edx2gift
+          paths:
+            - dist
+      # Store packages as artifacts to download/test them
+      - store_artifacts:
+          path: ~/edx2gift/dist
+
+  # Publishing to PyPI requires that:
+  #   * you already registered to pypi.org
+  #   * you have define both the TWINE_USERNAME & TWINE_PASSWORD secret
+  #     environment variables in CircleCI UI (with your PyPI credentials)
+  pypi:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/edx2gift
+    steps:
+      - checkout
+      # Restore built python packages
+      - attach_workspace:
+          at: ~/edx2gift
+      - run:
+          name: List built packages
+          command: ls dist/*
+      - run:
+          name: Install base requirements (twine)
+          command: pip install --user .[ci]
+      - run:
+          name: Upload built packages to PyPI
+          command: ~/.local/bin/twine upload dist/*
+
+workflows:
+  version: 2
+
+  edx2gift:
+    jobs:
+      # Git jobs
+      #
+      # Check validity of git history
+      - lint-git:
+          filters:
+            tags:
+              only: /.*/
+      # Check CHANGELOG update
+      - check-changelog:
+          filters:
+            branches:
+              ignore: main
+            tags:
+              only: /(?!^v).*/
+      - lint-changelog:
+          filters:
+            branches:
+              ignore: main
+            tags:
+              only: /.*/
+
+      # Dev jobs
+      #
+      # Build, lint and test development Docker images
+      # (debian-based)
+      - build:
+          filters:
+            tags:
+              only: /.*/
+      - lint:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /.*/
+      - test:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /.*/
+
+      #
+      # Build the python package
+      - package:
+          requires:
+            - lint
+            - test
+          filters:
+            tags:
+              only: /.*/
+
+      # PyPI publication.
+      #
+      # Publish python package to PYPI only if all build, lint and test jobs
+      # succeed and it has been tagged with a tag starting with the letter v
+      - pypi:
+          requires:
+            - package
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
