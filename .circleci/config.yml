@@ -177,13 +177,13 @@ workflows:
       - check-changelog:
           filters:
             branches:
-              ignore: main
+              ignore: master
             tags:
               only: /(?!^v).*/
       - lint-changelog:
           filters:
             branches:
-              ignore: main
+              ignore: master
             tags:
               only: /.*/
 
