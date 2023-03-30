@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 def escape_text(text: str) -> str:
     """Escapes special characters that are not allowed in GIFT format."""
+    if not text:
+        return ""
     for char in "~=#{}:":
         text = text.replace(char, f"\\{char}")
     return re.sub(" +", " ", text.replace("\n", " ")).strip()
