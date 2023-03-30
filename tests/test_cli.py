@@ -124,6 +124,31 @@ def test_cli_convert_edx_2_gift_with_nested_problem():
     assert "".join(convert_edx_2_gift(xml)) == expected
 
 
+def test_cli_convert_edx_2_gift_producing_invalid_results():
+    """Tests the convert_edx_2_gift function, given a not supported problem type, should
+    yield an invalid result."""
+    # Converting quizzes containg images is not supported.
+    xml = """
+        <problem>
+        <p>Choice response question prompt?</p>
+        <choiceresponse>
+        <checkboxgroup>
+            <choice correct="false"><img src="file_1"/></choice>
+            <choice correct="true"><img src="file_2"/></choice>
+        </checkboxgroup>
+        </choiceresponse>
+        </problem>
+    """
+
+    expected = """::Q1::[html]<p>Choice response question prompt?</p>{
+            ~%-100%
+            ~%100%
+        }
+    """
+    expected = expected.replace(" " * 12, "\t").replace(" " * 4, "")
+    assert "".join(convert_edx_2_gift(xml)) == expected
+
+
 def test_cli_cli(fs):
     """Tests the cli function."""
     # pylint: disable=invalid-name
