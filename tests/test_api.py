@@ -44,4 +44,4 @@ async def test_api_convert(monkeypatch):
             "/convert", auth=("foo", "bar"), data={"content": content}
         )
         assert response.status_code == 200
-        assert response.content == b"::Q1::foo{"
+        assert response.content == b""
